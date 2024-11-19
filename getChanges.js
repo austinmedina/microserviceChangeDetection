@@ -12,15 +12,15 @@ function getChanges(myData) {
         let nodeName = microservice["name"];
         // This if statement is used to filter nodes if a nodes_array 
         // has been inputted, and only uses nodes that are in the nodes_array
-        // if (nodes_array == undefined || nodes_array.includes(nodeName)){
-        //     nodes.push({
-        //         "nodeName": nodeName,
-        //         "nodeType": "microservice"
-        //     });
+        if (nodes_array == undefined || nodes_array.includes(nodeName)){
+            nodes.push({
+                "nodeName": nodeName,
+                "nodeType": "microservice"
+            });
 
-        // } else {
-        //     continue;
-        // }
+        } else {
+            continue;
+        }
         
         let controllers = microservice["controllers"];
         for (let i=0; i<controllers.length; i++){
@@ -134,8 +134,6 @@ function getChanges(myData) {
                 } 
             }
         }
-    
-
     }
 
     for (let i=0; i<microservices.length;i++){
@@ -182,72 +180,95 @@ function getLinkDifferences(link1, link2) {
     }
 }
 
-function getRequestDifferences(requests1, requests2) {
-    var additions = new Set([...mySet1].filter(x => !mySet2.has(x)));
-    var subtractions = new Set([...mySet2].filter(x => !mySet1.has(x)));
-    var unmodifiedLinks = new Set([...mySet1].filter(x => mySet2.has(x)));
+function getRequestDifferences(earlyCommit, laterCommit) {
+    var additions = []
+    var subtractions = []
+    var unmodifiedRequest = []
+    /*
+    A list of the all the indices of requests in laterCommit. As we match requests in laterCommit to earlyCommit we will remove the index. 
+    The remaining indicies are requests that were added
+    */
+    var matchedRequest = Array.from({ length: laterCommit.length }, (_, i) => i);
     
-    for (let i = 0; i <requests1.length; i++) {
-        let addition = false;
-        for (let j = 0; j < requests2.length; j++) {
-            if (requests[i]['source'] = requests[j]['source']) {
-                continue;
+    for (let i = 0; i <earlyCommit.length; i++) {
+        let matched = false;
+        for (let j = 0; j < laterCommit.length; j++) {
+            if (earlyCommit[i]['type'] == laterCommit[j]['type'] && 
+                earlyCommit[i]['destinationUrl'] == laterCommit[j]['destinationUrl'] &&
+                earlyCommit[i]['sourceMethod'] == laterCommit[j]['sourceMethod'] &&
+                earlyCommit[i]['destinationclassName'] == laterCommit[j]['destinationclassName'] &&
+                earlyCommit[i]['className'] == laterCommit[j]['className'] &&
+                earlyCommit[i]['msReturn'] == laterCommit[j]['msReturn'] 
+            ) {
+                unmodifiedRequest.push(laterCommit[j]); 
+                matched = true;
+                matchedRequest.splice(matchedRequest.indexOf(j), 1);            
             }
+        }
+
+        if (!matched) {
+            subtractions.push(earlyCommit[i])
         }
     }
 
-    
+    for (let index in matchedRequest) {
+        additions.push(laterCommit[index])
+    }
 
     return {
         "linkAdditions" : additions,
         "linkSubtractions" : subtractions,
-        "unmodifiedLinks": unmodifiedLinks
+        "unmodifiedRequest": unmodifiedRequest
     }
 }
 
 const findModifications = (linkA, linkB) => {
     let connectionAdditions = {};
-    let requestAdditions = {};
     let connectionSubtractions = {};
-    let requestSubtractions = {};
-    let unmodified = {};
+    let existingLinks = {};
 
     const linkDifferences = getLinkDifferences(linkA, linkB);
     
-    for (let k in linkDifferences["linkAdditions"]) {
+    /*
+    Loops through a set containing all the keys of microservice links, 
+    and adds the link object (which includes the requests between the two and more info) 
+    to a dictionary of microservice links that have been added since the previous commit
+    */
+    for (let k of linkDifferences["linkAdditions"]) {
         connectionAdditions[k] = linkB[k];
     }
 
-    for (let k in linkDifferences["linkSubtractions"]) {
+    for (let k of linkDifferences["linkSubtractions"]) {
         connectionSubtractions[k] = linkA[k];
     }
 
     
-    for (let k in linkDifference['unmodifiedLinks']) {
+    for (let k of linkDifferences['unmodifiedLinks']) {
         let requestsA = linkA[k]['requests']
         let requestsB = linkB[k]['requests']
-        subLinkDifferences = getRequestDifferences(requestsA, requestsB)
+        let requestDifferences = getRequestDifferences(requestsA, requestsB);
+        existingLinks[k] = {'source': linkB[k]['source'], 'target': linkB[k]['target'], 'requests' : requestDifferences};
+        console.log("BLAH");
     }
     
     return {
         "connectionAdditions": connectionAdditions,
-        "requestAdditions": requestAdditions,
         "connectionSubtractions": connectionSubtractions,
-        "requestSubtractions": requestSubtractions,
-        "unmodified": unmodified,
+        "existingLinks": existingLinks,
     }
     
 };
 
 function compareChanges() {
     const file1 = JSON.parse(fs.readFileSync("./data/IR2_57b3.json", 'utf-8'));
-    const file2 = JSON.parse(fs.readFileSync("./data/IR319_350f.json", 'utf-8'));
+    const file2 = JSON.parse(fs.readFileSync("./data/IR3_3ea1.json", 'utf-8'));
     const commitLink1 = getChanges(file1)['links'];
     const commitLink2 = getChanges(file2)['links'];
 
     //Need to find subtractions and additions in the requests of 
     const modifications = findModifications(commitLink1, commitLink2);
-    console.log("blah");
+
+    return modifications;
 }
 
 compareChanges();

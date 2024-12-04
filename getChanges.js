@@ -138,7 +138,7 @@ function getChanges(myData, nodes_array) {
 
     for (let i=0; i<microservices.length;i++){
         let microservice = microservices[i];
-        let nodeName = microservice["name"];
+        // let nodeName = microservice["name"];
 
         // if (!(nodes_array == undefined) && !(nodes_array.includes(nodeName))){
         //     continue;
@@ -154,7 +154,7 @@ function getChanges(myData, nodes_array) {
         "graphName": "msgraph",
         "nodes": nodes, 
         "links": links, 
-        "gitCommitId": "0"
+        "gitCommitId": myData["commitID"]
     };
 }
 
@@ -209,7 +209,7 @@ function getNodeDifferences(earlyCommit, laterCommit) {
     }
 
     for (let index in matchedNodes) {
-        additions.push(laterCommit[index])
+        additions.push(laterCommit[matchedNodes[index]]);
     }
 
     return {
@@ -246,12 +246,12 @@ function getRequestDifferences(earlyCommit, laterCommit) {
         }
 
         if (!matched) {
-            subtractions.push(earlyCommit[i])
+            subtractions.push(earlyCommit[i]);
         }
     }
 
     for (let index in matchedRequest) {
-        additions.push(laterCommit[index])
+        additions.push(laterCommit[matchedRequest[index]]);
     }
 
     return {
@@ -262,13 +262,15 @@ function getRequestDifferences(earlyCommit, laterCommit) {
 }
 
 const findModifications = (linkA, linkB) => {
-    let connectionAdditions = {};
-    let connectionSubtractions = {};
-    let existingLinks = {};
+    // let connectionAdditions = {};
+    // let connectionSubtractions = {};
+    // let existingLinks = {};
 
-    let nodeAdditions = [];
-    let nodeSubtractions = [];
-    let existingNodes = [];
+    // let nodeAdditions = [];
+    // let nodeSubtractions = [];
+    // let existingNodes = [];
+    let nodes = [];
+    let links = {};
 
     const linkDifferences = getLinkDifferences(linkA['links'], linkB['links']);
     
@@ -278,11 +280,13 @@ const findModifications = (linkA, linkB) => {
     to a dictionary of microservice links that have been added since the previous commit
     */
     for (let k of linkDifferences["linkAdditions"]) {
-        connectionAdditions[k] = linkB['links'][k];
+        links[k] = linkB['links'][k];
+        links[k]["color"] = "green";
     }
 
     for (let k of linkDifferences["linkSubtractions"]) {
-        connectionSubtractions[k] = linkA['links'][k];
+        links[k] = linkA['links'][k];
+        links[k]["color"] = "red";
     }
 
     
@@ -290,7 +294,11 @@ const findModifications = (linkA, linkB) => {
         let requestsA = linkA['links'][k]['requests']
         let requestsB = linkB['links'][k]['requests']
         let requestDifferences = getRequestDifferences(requestsA, requestsB);
-        existingLinks[k] = {'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests' : requestDifferences};
+        // FIXME Needs some iterating though requestDifferences here to determine color and should set requests to requestsB
+        if (requestDifferences["linkAdditions"].length == 0 && requestDifferences["linkSubtractions"] == 0) {
+            links[k] = {'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests': requestsB};
+        }
+        links[k] = {'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests': requestsB, "color": "yellow"};
     }
 
 
@@ -301,28 +309,38 @@ const findModifications = (linkA, linkB) => {
     and adds the link object (which includes the requests between the two and more info) 
     to a dictionary of microservice links that have been added since the previous commit
     */
-    for (let k of nodeDifferences["linkAdditions"]) {
-        nodeAdditions.push(linkB['nodes'][k]);
+    for (let k of nodeDifferences["nodeAdditions"]) {
+        k["color"] = "green";
+        nodes.push(k);
+
     }
 
-    for (let k of nodeDifferences["linkSubtractions"]) {
-        nodeSubtractions.push(linkA['nodes'][k]);
+    for (let k of nodeDifferences["nodeSubtractions"]) {
+        k["color"] = "red";
+        nodes.push(k);
     }
 
-    
-    for (let k of nodeDifferences['unmodifiedLinks']) {
-        existingNodes.push(linkB['nodes'][k]);
+    // FIXME HUGE PROBLEM we have duplicates here also I'm modifying an original object
+    for (let k of nodeDifferences['unmodifiedNodes']) {
+        // No color?
+        nodes.push(k);
     }
 
-    
     return {
-        "connectionAdditions": connectionAdditions,
-        "connectionSubtractions": connectionSubtractions,
-        "existingLinks": existingLinks,
-        "nodeAdditions":nodeAdditions,
-        "nodeSubtractions":nodeSubtractions,
-        "existingNodes":existingNodes
-    }
+            "graphName": "msgraph",
+            "nodes": nodes, 
+            "links": links, 
+            "gitCommitId": linkB["commitID"]
+        };
+    
+    // return {
+    //     "connectionAdditions": connectionAdditions,
+    //     "connectionSubtractions": connectionSubtractions,
+    //     "existingLinks": existingLinks,
+    //     "nodeAdditions":nodeAdditions,
+    //     "nodeSubtractions":nodeSubtractions,
+    //     "existingNodes":existingNodes
+    // }
     
 };
 
@@ -331,23 +349,24 @@ function compareChanges() {
     const file2 = JSON.parse(fs.readFileSync("./data/IR3_3ea1.json", 'utf-8'));
     const commitLink1 = getChanges(file1, undefined);
     const commitLink2 = getChanges(file2, undefined);
+    commitLink2["commitID"] = file2["commitID"]
 
     //Need to find subtractions and additions in the requests of 
     const modifications = findModifications(commitLink1, commitLink2);
 
-    let nodes = [];
-    let links = {};
+    // let nodes = [];
+    // let links = {};
 
-    for (let k of modifications) {
+    // for (let k of modifications) {
 
-    }
+    // }
 
-    return {
-        "graphName": "msgraph",
-        "nodes": nodes, 
-        "links": links, 
-        "gitCommitId": "0"
-    };
+    // return {
+    //     "graphName": "msgraph",
+    //     "nodes": nodes, 
+    //     "links": links, 
+    //     "gitCommitId": "0"
+    // };
 
     return modifications;
 }

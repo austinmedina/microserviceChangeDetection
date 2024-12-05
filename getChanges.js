@@ -270,7 +270,7 @@ const findModifications = (linkA, linkB) => {
     // let nodeSubtractions = [];
     // let existingNodes = [];
     let nodes = [];
-    let links = {};
+    let links = [];
 
     const linkDifferences = getLinkDifferences(linkA['links'], linkB['links']);
     
@@ -280,13 +280,11 @@ const findModifications = (linkA, linkB) => {
     to a dictionary of microservice links that have been added since the previous commit
     */
     for (let k of linkDifferences["linkAdditions"]) {
-        links[k] = linkB['links'][k];
-        links[k]["color"] = "green";
+        links.push({"name": k, ...linkB['links'][k], color: "green" });
     }
 
     for (let k of linkDifferences["linkSubtractions"]) {
-        links[k] = linkA['links'][k];
-        links[k]["color"] = "red";
+        links.push({"name": k, ...linkA['links'][k], color: "red" });
     }
 
     
@@ -296,9 +294,11 @@ const findModifications = (linkA, linkB) => {
         let requestDifferences = getRequestDifferences(requestsA, requestsB);
         // FIXME Needs some iterating though requestDifferences here to determine color and should set requests to requestsB
         if (requestDifferences["linkAdditions"].length == 0 && requestDifferences["linkSubtractions"] == 0) {
-            links[k] = {'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests': requestsB};
+            links.push({'name': k, 'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests': requestsB});
         }
-        links[k] = {'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests': requestsB, "color": "yellow"};
+        else {
+            links.push({'name': k, 'source': linkB['links'][k]['source'], 'target': linkB['links'][k]['target'], 'requests': requestsB, "color": "yellow"});
+        }
     }
 
 
@@ -327,46 +327,23 @@ const findModifications = (linkA, linkB) => {
     }
 
     return {
-            "graphName": "msgraph",
-            "nodes": nodes, 
-            "links": links, 
-            "gitCommitId": linkB["commitID"]
-        };
-    
-    // return {
-    //     "connectionAdditions": connectionAdditions,
-    //     "connectionSubtractions": connectionSubtractions,
-    //     "existingLinks": existingLinks,
-    //     "nodeAdditions":nodeAdditions,
-    //     "nodeSubtractions":nodeSubtractions,
-    //     "existingNodes":existingNodes
-    // }
+        "graphName": "msgraph",
+        "nodes": nodes, 
+        "links": links, 
+        "gitCommitId": linkB["commitID"]
+    };
     
 };
 
 function compareChanges() {
     const file1 = JSON.parse(fs.readFileSync("./data/IR2_57b3.json", 'utf-8'));
-    const file2 = JSON.parse(fs.readFileSync("./data/IR3_3ea1.json", 'utf-8'));
+    const file2 = JSON.parse(fs.readFileSync("./data/IR319_350f.json", 'utf-8'));
     const commitLink1 = getChanges(file1, undefined);
     const commitLink2 = getChanges(file2, undefined);
     commitLink2["commitID"] = file2["commitID"]
 
     //Need to find subtractions and additions in the requests of 
     const modifications = findModifications(commitLink1, commitLink2);
-
-    // let nodes = [];
-    // let links = {};
-
-    // for (let k of modifications) {
-
-    // }
-
-    // return {
-    //     "graphName": "msgraph",
-    //     "nodes": nodes, 
-    //     "links": links, 
-    //     "gitCommitId": "0"
-    // };
 
     return modifications;
 }
